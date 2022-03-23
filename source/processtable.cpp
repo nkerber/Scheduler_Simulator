@@ -3,7 +3,7 @@
 
 #define PTSIZE 10000
 
-#include "pcb.cpp"
+#include "./pcb.cpp"
 
 class processtable{
     PCB* processes[PTSIZE];

@@ -6,7 +6,8 @@
 #include <stack>
 #include <cstdlib>
 #include <algorithm>
-#include "processtable.cpp"
+
+#define localstack stack<int>
 
 class PCB{
     public:
@@ -20,29 +21,41 @@ class PCB{
         int pc; // Arbitrary, likely won't use but for completion's sake
         int cCode; // Int to act as 32/64 flags. Likely won't be used, but here for completion's sake.
         int wait; // Used to determine waiting queues and how long that would add to the accum. variable.
-        int vars[20]; // Assume ints, for simplicity.
+        int* vars; // Assume ints, for simplicity.
         
         int arrival; // Int to determine when to initially place a process into the ready queue.
 
-        std::stack<int>* sys_stack; // Likely won't be used. Here for completion's sake.
+        std::stack<int>* sys_stack = nullptr; // Likely won't be used. Here for completion's sake.
 
         PCB() : PCB(rand()%9700+300){}
-
-        PCB(int id){
-            pid = id;
-            ppid = rand()%300;
-            uacct = rand()%3;
-            priority = rand()%5 + 1;
-            state = 0;
-            burst = rand()%15 + 1;
-            accum = 0;
-            pc = 0;
-            cCode = 0;
-            wait = 0;
-            std::fill_n(vars, 20, 0);
-            arrival = rand()%TIMERMAX;
-            sys_stack = nullptr;
+        PCB(int id) : PCB(id, rand()%300){}
+        PCB(int id, int ppid) : PCB(id, ppid, rand()%3){}
+        PCB(int id, int ppid, int uacct) : PCB(id, ppid, uacct, rand()%5 + 1){}
+        PCB(int id, int ppid, int uacct, int priority) : PCB(id, ppid, uacct, priority, 0){}
+        PCB(int id, int ppid, int uacct, int priority, int state) : PCB(id, ppid, uacct, priority, state, rand()%15+1){}
+        PCB(int id, int ppid, int uacct, int priority, int state, int burst) : PCB(id, ppid, uacct, priority, state, burst, 0){}
+        PCB(int id, int ppid, int uacct, int priority, int state, int burst, int accum) : PCB(id, ppid, uacct, priority, state, burst, accum, 0){}
+        PCB(int id, int ppid, int uacct, int priority, int state, int burst, int accum, int pc) : PCB(id, ppid, uacct, priority, state, burst, accum, pc, 0){}
+        PCB(int id, int ppid, int uacct, int priority, int state, int burst, int accum, int pc, int cCode) : PCB(id, ppid, uacct, priority, state, burst, accum, pc, cCode, 0){}
+        PCB(int id, int ppid, int uacct, int priority, int state, int burst, int accum, int pc, int cCode, int wait) : PCB(id, ppid, uacct, priority, state, burst, accum, pc, cCode, wait, nullptr){}
+        PCB(int id, int ppid, int uacct, int priority, int state, int burst, int accum, int pc, int cCode, int wait, int* vars) : PCB(id, ppid, uacct, priority, state, burst, accum, pc, cCode, wait, vars, rand()%TIMERMAX){}
+        // PCB(int id, int ppid, int uacct, int priority, int state, int burst, int accum, int pc, int cCode, int wait, int* vars, int arrival) : PCB(id, ppid, uacct, priority, state, burst, accum, pc, cCode, wait, vars, arrival, nullptr){}
+        PCB(int idIn, int ppidIn, int uacctIn, int priorityIn, int stateIn, int burstIn, int accumIn, int pcIn, int cCodeIn, int waitIn, int* varsIn, int arrivalIn){//, localstack* sysstackIn){
+            pid = idIn;
+            ppid = ppidIn;
+            uacct = uacctIn;
+            priority = priorityIn;
+            state = stateIn;
+            burst = burstIn;
+            accum = accumIn;    // Check for value. If 0, we add to accum. If nonzero, subtract from accum to reach end of process.
+            pc = pcIn;
+            cCode = cCodeIn;
+            wait = waitIn;
+            vars = varsIn;
+            arrival = arrivalIn;
+            // sys_stack = sysstackIn;
         }
+        
 };
 
 #endif

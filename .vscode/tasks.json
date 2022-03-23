@@ -13,7 +13,8 @@
                 "-I",
                 "\"${workspaceFolder}\"/headers",
                 "-ggdb",
-                "\"${workspaceFolder}\"/source/*.cpp"
+                "\"${workspaceFolder}\"/source/*.cpp",
+                "-pthread"
             ],
             "group": {
                 "kind": "build",
