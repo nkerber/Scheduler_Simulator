@@ -1,13 +1,16 @@
 #ifndef pcb
 #define pcb
 
-#define TIMERMAX 1000
+#define TIMERMAX 100
 
 #include <stack>
 #include <cstdlib>
 #include <algorithm>
+#include <iostream>
 
 #define localstack stack<int>
+#define decr 0
+#define incr 1
 
 class PCB{
     public:
@@ -19,9 +22,10 @@ class PCB{
         int burst; // 1-15 clock cycles (cc)
         int accum; // Total cc this process has been worked on (Transfer, wait, proccess, etc.)
         int pc; // Arbitrary, likely won't use but for completion's sake
-        int cCode; // Int to act as 32/64 flags. Likely won't be used, but here for completion's sake.
+        int cSwitch; // Int to act as 32/64 flags. Likely won't be used, but here for completion's sake.
         int wait; // Used to determine waiting queues and how long that would add to the accum. variable.
         int* vars; // Assume ints, for simplicity.
+        bool incdec = incr; // Inc means indefinitely running, so count how many time quantums the program runs for. Dec means we have a set number of operations to run, so go until it's finished. This is taken care of in accum().
         
         int arrival; // Int to determine when to initially place a process into the ready queue.
 
@@ -36,26 +40,51 @@ class PCB{
         PCB(int id, int ppid, int uacct, int priority, int state, int burst) : PCB(id, ppid, uacct, priority, state, burst, 0){}
         PCB(int id, int ppid, int uacct, int priority, int state, int burst, int accum) : PCB(id, ppid, uacct, priority, state, burst, accum, 0){}
         PCB(int id, int ppid, int uacct, int priority, int state, int burst, int accum, int pc) : PCB(id, ppid, uacct, priority, state, burst, accum, pc, 0){}
-        PCB(int id, int ppid, int uacct, int priority, int state, int burst, int accum, int pc, int cCode) : PCB(id, ppid, uacct, priority, state, burst, accum, pc, cCode, 0){}
-        PCB(int id, int ppid, int uacct, int priority, int state, int burst, int accum, int pc, int cCode, int wait) : PCB(id, ppid, uacct, priority, state, burst, accum, pc, cCode, wait, nullptr){}
-        PCB(int id, int ppid, int uacct, int priority, int state, int burst, int accum, int pc, int cCode, int wait, int* vars) : PCB(id, ppid, uacct, priority, state, burst, accum, pc, cCode, wait, vars, rand()%TIMERMAX){}
+        PCB(int id, int ppid, int uacct, int priority, int state, int burst, int accum, int pc, int cSwitch) : PCB(id, ppid, uacct, priority, state, burst, accum, pc, cSwitch, 0){}
+        PCB(int id, int ppid, int uacct, int priority, int state, int burst, int accum, int pc, int cSwitch, int wait) : PCB(id, ppid, uacct, priority, state, burst, accum, pc, cSwitch, wait, nullptr){}
+        PCB(int id, int ppid, int uacct, int priority, int state, int burst, int accum, int pc, int cSwitch, int wait, int* vars) : PCB(id, ppid, uacct, priority, state, burst, accum, pc, cSwitch, wait, vars, rand()%TIMERMAX){}
         // PCB(int id, int ppid, int uacct, int priority, int state, int burst, int accum, int pc, int cCode, int wait, int* vars, int arrival) : PCB(id, ppid, uacct, priority, state, burst, accum, pc, cCode, wait, vars, arrival, nullptr){}
-        PCB(int idIn, int ppidIn, int uacctIn, int priorityIn, int stateIn, int burstIn, int accumIn, int pcIn, int cCodeIn, int waitIn, int* varsIn, int arrivalIn){//, localstack* sysstackIn){
+        PCB(int idIn, int ppidIn, int uacctIn, int priorityIn, int stateIn, int burstIn, int accumIn, int pcIn, int cSwitchIn, int waitIn, int* varsIn, int arrivalIn){//, localstack* sysstackIn){
             pid = idIn;
             ppid = ppidIn;
             uacct = uacctIn;
             priority = priorityIn;
             state = stateIn;
             burst = burstIn;
-            accum = accumIn;    // Check for value. If 0, we add to accum. If nonzero, subtract from accum to reach end of process.
+            if(accumIn > 0)
+                incdec = decr;
+            accum = accumIn;
             pc = pcIn;
-            cCode = cCodeIn;
+            cSwitch = cSwitchIn;
             wait = waitIn;
             vars = varsIn;
             arrival = arrivalIn;
             // sys_stack = sysstackIn;
         }
-        
+
+        void trans(){
+            accum += 1; // Transfer time quantum
+            cSwitch += 1; // Transfer time quantum
+        }
+
+        void accu(int value = 0){
+            if(incdec == decr){
+                if(accum <= 0){
+                    // Remove this process from the table by signalling an exit state
+                    state = 4;
+                }else{
+                    if(value != 0)
+                        accum -= value;
+                    else
+                        accum -= burst * priority;
+                }
+            }else{
+                if(value != 0)
+                    accum += value;
+                else
+                    accum += burst * priority;
+            }
+        }
 };
 
 #endif
