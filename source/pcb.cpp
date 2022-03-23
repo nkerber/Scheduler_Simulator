@@ -3,13 +3,10 @@
 
 #define TIMERMAX 1000
 
-// Access enum using PSTATE::[NEW/READY/RUNNING/BLOCKED/EXIT]
-static enum PSTATE{NEW, READY, RUNNING, BLOCKED, EXIT};
-
 #include <stack>
 #include <cstdlib>
 #include <algorithm>
-#include "processtable.h"
+#include "processtable.cpp"
 
 class PCB{
     public:
@@ -23,7 +20,7 @@ class PCB{
         int pc; // Arbitrary, likely won't use but for completion's sake
         int cCode; // Int to act as 32/64 flags. Likely won't be used, but here for completion's sake.
         int wait; // Used to determine waiting queues and how long that would add to the accum. variable.
-        int vars[100]; // Assume ints, for simplicity.
+        int vars[20]; // Assume ints, for simplicity.
         
         int arrival; // Int to determine when to initially place a process into the ready queue.
 
@@ -42,7 +39,7 @@ class PCB{
             pc = 0;
             cCode = 0;
             wait = 0;
-            std::fill_n(vars, 100, 0);
+            std::fill_n(vars, 20, 0);
             arrival = rand()%TIMERMAX;
             sys_stack = nullptr;
         }
