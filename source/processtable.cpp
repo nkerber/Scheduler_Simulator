@@ -6,7 +6,7 @@
 #include "./pcb.cpp"
 
 class processtable{
-    PCB* processes[PTSIZE];
+    PCBFile* processes[PTSIZE];
 
     public: 
         processtable(){
@@ -15,7 +15,7 @@ class processtable{
             }
         }
 
-        bool add(PCB* in){
+        bool add(PCBFile* in){
             int t = hasSpace();
             if(t >= 0){
                 processes[t] = in;
@@ -35,7 +35,7 @@ class processtable{
             return false;
         }
 
-        PCB* operator[](const int i){
+        PCBFile* operator[](const int i){
             return processes[i];
         }
 

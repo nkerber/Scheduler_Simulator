@@ -7,6 +7,7 @@
 #include <cstdlib>
 #include <algorithm>
 #include <iostream>
+#include <vector>
 
 #define localstack stack<int>
 #define decr 0
@@ -61,24 +62,46 @@ class PCB{
             arrival = arrivalIn;
             // sys_stack = sysstackIn;
         }
+};
 
+class PCBFile : public PCB {
+    public:
+        std::vector<int>* CPUt;
+        std::vector<int>* IOt;
+
+        PCBFile(int pid, int arr, std::vector<int> *cputimes, std::vector<int> *iotimes) : PCB(pid) {
+            this->pid = pid;
+            if(arr != -1)
+                this->arrival = arr;
+            this->CPUt = cputimes;
+            this->IOt = iotimes;
+        }
+        
         void trans(){
-            accum += 1; // Transfer time quantum
-            cSwitch += 1; // Transfer time quantum
+            if(CPUt->empty() && IOt->empty()){  // If we have no more to do
+                // Remove this process from the table by signalling an exit state
+                state = 4;
+            }else{
+                accum += 1; // Transfer time quantum
+                cSwitch += 1; // Transfer time quantum
+            }
         }
 
         void accu(int value = 0){
-            if(incdec == decr){
-                if(accum <= 0){
+            if(incdec == decr){ // If we are using file IO
+                if(CPUt->empty() && IOt->empty()){  // If we have no more to do
                     // Remove this process from the table by signalling an exit state
                     state = 4;
                 }else{
-                    if(value != 0)
-                        accum -= value;
-                    else
-                        accum -= burst * priority;
+                    if(value != 0){
+                        if(!CPUt->empty())
+                            CPUt->front() -= value;
+                    }else{
+                        CPUt->front() -= burst * priority;
+                    }
                 }
-            }else{
+
+            }else{  // If we are not using file IO and this is an indefinite process
                 if(value != 0)
                     accum += value;
                 else
@@ -88,93 +111,3 @@ class PCB{
 };
 
 #endif
-
-// Hunter's PID distribution system.
-
-// #define MINPID 300
-// #define MAXPID 10000
-
-// #include <stack>
-// #include <exception>
-// #include <stdlib.h>
-// #include <time.h>
-// #include <unistd.h>
-// #include <iostream>
-// #include <thread>
-// #include <mutex>
-// #include <vector>
-// #include <cstdlib>
-
-// using namespace std;
-
-// // Part 1
-
-// int threadNum = 1000;
-// mutex m;
-// stack<int> pids;
-
-// int initialize_map(void){
-// 	try{	// Assuming we want to utilize the lowest pids first, we push to the stack in reverse.
-// 		for(int i = MAXPID; i >= MINPID; i--){
-// 			pids.push(i);
-// 		}
-
-// 		return 1;
-// 	}catch(exception e){
-// 		return -1;
-// 	}
-// }
-
-// // Remove the pid from the stack so nobody else gets to use it
-// int allocate_pid(void){
-// 	int t = pids.top(); pids.pop();
-// 	return t;
-// }
-
-// // To release, simply add it back to the stack
-// void release_pid(int pid, int time){
-// 	pids.push(pid);
-// 	cout << "Releasing PID (" << time << "): " << pid << endl;
-// }
-
-// // Part 2
-
-// // Code for threads to execute
-// void execute(){
-// 	int pid;
-// 	{	// Grab the lock, and allocate the process ID
-// 		lock_guard<mutex> g(m);
-// 		pid = allocate_pid();
-// 	}	// Unlock
-
-// 	// Simulate thread operation by sleeping for a random time
-// 	int t = rand()%10;
-// 	sleep(t);
-
-// 	{	// Grab the lock again and release the pid
-// 		lock_guard<mutex> g(m);
-// 		release_pid(pid, t);
-// 	}	// Unlock
-// }
-
-// int main(){
-// 	srand(time(NULL));
-// 	vector<thread> threads;
-// 	int pid = 1;
-
-// 	// Initialize our pids
-// 	if(initialize_map() == -1){
-// 		cout << "Error occured in data structure initialization. Exiting." << endl;
-// 		return -1;
-// 	}
-
-// 	// Spawn threadNum threads
-// 	for(int i = 0; i < threadNum; i++){
-// 		threads.push_back(thread(execute));
-// 	}
-
-// 	// Join the threads
-// 	for(int i = 0; i < threadNum; i++){
-// 		threads[i].join();
-// 	}
-// }
