@@ -1,17 +1,17 @@
 #ifndef pcb
 #define pcb
 
-#define TIMERMAX 100
-
 #include <stack>
 #include <cstdlib>
 #include <algorithm>
 #include <iostream>
 #include <vector>
+#include "./globals.cpp"
 
-#define localstack stack<int>
 #define decr 0
 #define incr 1
+
+const int IOsims[5]= {10,8,6,4,2};                              // All assumed to have differrent wait times based on to simulate slower IO devices.
 
 class PCB{
     public:
@@ -35,7 +35,7 @@ class PCB{
         PCB() : PCB(rand()%9700+300){}
         PCB(int id) : PCB(id, rand()%300){}
         PCB(int id, int ppid) : PCB(id, ppid, rand()%3){}
-        PCB(int id, int ppid, int uacct) : PCB(id, ppid, uacct, rand()%5 + 1){}
+        PCB(int id, int ppid, int uacct) : PCB(id, ppid, uacct, rand()%queueCount + 1){}
         PCB(int id, int ppid, int uacct, int priority) : PCB(id, ppid, uacct, priority, 0){}
         PCB(int id, int ppid, int uacct, int priority, int state) : PCB(id, ppid, uacct, priority, state, rand()%15+1){}
         PCB(int id, int ppid, int uacct, int priority, int state, int burst) : PCB(id, ppid, uacct, priority, state, burst, 0){}
@@ -78,7 +78,7 @@ class PCBFile : public PCB {
         }
         
         void trans(){
-            if(CPUt != nullptr && CPUt->empty() && IOt != nullptr && IOt->empty()){  // If we have no more to do
+            if(incdec == decr && CPUt != nullptr && CPUt->empty() && IOt != nullptr && IOt->empty()){  // If we have no more to do
                 // Remove this process from the table by signalling an exit state
                 state = 4;
                 cSwitch += 1; // Transfer time quantum
@@ -109,6 +109,27 @@ class PCBFile : public PCB {
                     accum += value;
                 else
                     accum += burst * priority;
+            }
+        }
+
+        void io(){
+            if(incdec == incr){
+                // If process is sent to an I/O wait
+                if(rand() % 2){
+                    state = PSTATE::BLOCKED;
+                    wait += IOsims[rand() % 5]; // 5 = Number of IO "queues" to simulate IO wait times
+                    trans();
+                }
+            }else{
+                // Calculate where the next IO location would be based on however we would store our I/O locations
+                if(CPUt != nullptr && CPUt->front() <= 0){  // If we have hit an IO location
+                    CPUt->erase(CPUt->begin());
+                    if(IOt != nullptr && !IOt->empty()){
+                        state = PSTATE::BLOCKED;
+                        wait += IOt->front();
+                        trans();
+                    }
+                }
             }
         }
 };

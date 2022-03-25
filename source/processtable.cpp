@@ -39,6 +39,16 @@ class processtable{
             return processes[i];
         }
 
+        int size(){
+            for(int i = 0; i < PTSIZE; i++){
+                if(processes[i] == nullptr){
+                    return i;
+                }
+            }
+
+            return PTSIZE;
+        }
+
     private:
         int hasSpace(){
             for(int i = 0; i < PTSIZE; i++){
