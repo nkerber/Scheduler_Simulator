@@ -78,9 +78,10 @@ class PCBFile : public PCB {
         }
         
         void trans(){
-            if(CPUt->empty() && IOt->empty()){  // If we have no more to do
+            if(CPUt != nullptr && CPUt->empty() && IOt != nullptr && IOt->empty()){  // If we have no more to do
                 // Remove this process from the table by signalling an exit state
                 state = 4;
+                cSwitch += 1; // Transfer time quantum
             }else{
                 accum += 1; // Transfer time quantum
                 cSwitch += 1; // Transfer time quantum
@@ -89,15 +90,17 @@ class PCBFile : public PCB {
 
         void accu(int value = 0){
             if(incdec == decr){ // If we are using file IO
-                if(CPUt->empty() && IOt->empty()){  // If we have no more to do
+                if(CPUt != nullptr && CPUt->empty() && IOt != nullptr && IOt->empty()){  // If we have no more to do
                     // Remove this process from the table by signalling an exit state
                     state = 4;
+                    cSwitch += 1; // Transfer time quantum
                 }else{
                     if(value != 0){
-                        if(!CPUt->empty())
+                        if(CPUt != nullptr && !CPUt->empty())
                             CPUt->front() -= value;
                     }else{
-                        CPUt->front() -= burst * priority;
+                        if(CPUt != nullptr && !CPUt->empty())
+                            CPUt->front() -= burst * priority;
                     }
                 }
 

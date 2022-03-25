@@ -90,9 +90,9 @@ void RR_Exit(PCBFile *myProc){
     myProc->trans();
 
     // Calculate where the next IO location would be based on however we would store our I/O locations
-    if(myProc->CPUt->front() <= 0){  // If we have hit an IO location
+    if(myProc->CPUt != nullptr && myProc->CPUt->front() <= 0){  // If we have hit an IO location
         myProc->CPUt->erase(myProc->CPUt->begin());
-        if(!myProc->IOt->empty()){
+        if(myProc->IOt != nullptr && !myProc->IOt->empty()){
             myProc->state = PSTATE::BLOCKED;
             myProc->wait += myProc->IOt->front();
             myProc->trans();
