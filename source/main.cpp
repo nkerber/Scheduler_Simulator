@@ -23,8 +23,8 @@ int transfer = 1; // Taken from PCB data structure, counting relevant register/m
 
 int IOsims[5]= {10,8,6,4,2}; // All assumed to have differrent wait times based on to simulate slower IO devices.
 
-queue<PCB*> ready;      // All ready processes will be placed in this queue
-queue<PCB*> pready[queueCount+1];  // This will waste memory space for pqueue[0] as we will only be using 1-queueCount+1
+queue<PCBFile*> ready;      // All ready processes will be placed in this queue
+queue<PCBFile*> pready[queueCount+1];  // This will waste memory space for pqueue[0] as we will only be using 1-queueCount+1
 mutex rm;
 mutex prm[queueCount+1];
 
@@ -33,7 +33,7 @@ bool done = false;
 int timer = 0;
 
 // Push a process onto the queue and set its state to ready.
-void r(PCB* item){
+void r(PCBFile* item){
     if(FCFS){
         rm.lock();
         ready.push(item);
@@ -47,8 +47,8 @@ void r(PCB* item){
     }
 }
 
-PCB* getPCB(bool fcfs = true, int pq = 1){
-    PCB* x;
+PCBFile* getPCB(bool fcfs = true, int pq = 1){
+    PCBFile* x;
     if(fcfs == true){
         rm.lock();
         x = ready.front();
@@ -69,7 +69,7 @@ PCB* getPCB(bool fcfs = true, int pq = 1){
     return x;
 }
 
-void FCFS_Exit(PCB *myProc){
+void FCFS_Exit(PCBFile *myProc){
     // Account for transfer time to any of our queues
     myProc->trans();
     
@@ -85,17 +85,19 @@ void FCFS_Exit(PCB *myProc){
         r(myProc);
 }
 
-// TODO: RR - Figure out how to compute IO locations and keep track of where we are at.
-//              Add to the wait variable for each PCB that hits an IO location
-void RR_Exit(PCB *myProc){
+// 
+void RR_Exit(PCBFile *myProc){
     myProc->trans();
 
     // Calculate where the next IO location would be based on however we would store our I/O locations
-
-    // If we reach an IO spot
-        // myProc->state = PSTATE::BLOCKED;
-        // myProc->wait += waitTime
-        // myProc->trans();
+    if(myProc->CPUt->front() <= 0){  // If we have hit an IO location
+        myProc->CPUt->erase(myProc->CPUt->begin());
+        if(!myProc->IOt->empty()){
+            myProc->state = PSTATE::BLOCKED;
+            myProc->wait += myProc->IOt->front();
+            myProc->trans();
+        }
+    }
     
     if(myProc->state != PSTATE::EXIT)
         r(myProc);
@@ -103,7 +105,7 @@ void RR_Exit(PCB *myProc){
 
 // Unicore process algorithm 1
 void run_sim_unicore_FCFS() {
-    PCB* x;
+    PCBFile* x;
     while(!ready.empty() && !done){
         // Get the next available PCB
         x = getPCB();
@@ -139,7 +141,7 @@ void run_sim_unicore_RR() {
 
     int num_ran = 0; // Keep track of runs of current queue to make sure we aren't stuck on high priority forever
     int cqueue = (rand()%5) + 1; // Set the current queue to random priority
-    PCB *tempPCB;
+    PCBFile* tempPCB;
     while(!emptyQueues()){
         if(num_ran == cqueue) {
             num_ran = 0;
@@ -229,19 +231,29 @@ int main(){
 
     // TODO: Create data structure for storing IO locations? 
     if(USEDATAFILE) {
-       ofstream inputfile;
-       inputfile.open("random_pids.csv")
-       if inputfile.is_open() {
-           while (getline(inputfile,line)) {
-               String procLine = line;
+        int pid;
+        int arrivalTime;
+        vector<int> cpuTimes;
+        vector<int> ioTimes;
+        fstream inputfile;
+        inputfile.open("random_pids.csv");
+        if (inputfile.is_open()) {
+            string li;
+            while (getline(inputfile, li,' ')) {
+               cout << li << endl;
                 
-           }
-       }
+
+                
+            }
+        }
+
+        PT.add(new PCBFile(pid, arrivalTime, &cpuTimes, &ioTimes));
+
     } else {
         // Create our processes, and add them to our process table.
         for(int i = 0; i < PROCESSNUM; i++){
             if(!pids.empty()){
-                PT.add(new PCB(pids.top()));
+                PT.add(new PCBFile(pids.top(), -1, nullptr, nullptr));
                 pids.pop();
             }else{
                 printf("Unable to create new process. Insufficient memory.\n");
