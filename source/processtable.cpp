@@ -6,12 +6,30 @@
 #include "./pcb.cpp"
 
 class processtable{
-    PCBFile* processes[PTSIZE];
+    private:
+        PCBFile* processes[PTSIZE];
+        PCBFile* oldProcesses[2*PTSIZE];
+        int activeCount;
 
     public: 
         processtable(){
+            activeCount = 0;
+
             for(int i = 0; i < PTSIZE; i++){
                 processes[i] = nullptr;
+            }
+        }
+
+        ~processtable(){
+            for(int i = 0; i < PTSIZE; i++){
+                if(processes[i] != nullptr){
+                    delete processes[i];
+                    processes[i] = nullptr;
+                }
+                if(oldProcesses[i] != nullptr){
+                    delete oldProcesses[i];
+                    oldProcesses[i] = nullptr;
+                }
             }
         }
 
@@ -19,6 +37,7 @@ class processtable{
             int t = hasSpace();
             if(t >= 0){
                 processes[t] = in;
+                ++activeCount;
                 return true;
             }
 
@@ -27,8 +46,9 @@ class processtable{
 
         bool remove(int i){
             if(processes[i] != nullptr){
-                delete processes[i];
+                transferProcess(processes[i]);
                 processes[i] = nullptr;
+                --activeCount;
                 return true;
             }
 
@@ -40,16 +60,28 @@ class processtable{
         }
 
         int size(){
-            for(int i = 0; i < PTSIZE; i++){
-                if(processes[i] == nullptr){
-                    return i;
-                }
-            }
+            return activeCount;
+        }
 
-            return PTSIZE;
+        int oldSize(){
+            for(int i = 0; i < 2*PTSIZE; i++){
+                if(oldProcesses[i] == nullptr)
+                    return i;
+            }
+            return 0;
         }
 
     private:
+
+        void transferProcess(PCBFile* in){
+            for(int i = 0; i < 2*PTSIZE; i++){
+                if(oldProcesses[i] == nullptr){
+                    oldProcesses[i] = in;
+                    return;
+                }
+            }
+        }
+
         int hasSpace(){
             for(int i = 0; i < PTSIZE; i++){
                 if(processes[i] == nullptr){
