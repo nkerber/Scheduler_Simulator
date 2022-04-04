@@ -7,6 +7,7 @@
 #include <mutex>
 #include <iostream>
 #include <fstream>
+#include <cstdlib>
 
 using namespace std;
 
@@ -69,8 +70,12 @@ PCBFile* getPCB(bool fcfs = true, int pq = 1){
         if(!pready[pq].empty()){
             // Lock, pop, unlock
             prm[pq].lock();
-            x = pready[pq].front();
-            pready[pq].pop();
+            try{
+                x = pready[pq].front();
+                pready[pq].pop();
+            }catch(exception e){
+                return nullptr;
+            }
             prm[pq].unlock();
         }else{
             return nullptr;
@@ -80,7 +85,7 @@ PCBFile* getPCB(bool fcfs = true, int pq = 1){
     return x;
 }
 
-// Remove the given PCB from the round robin processor
+// Remove the given PCB from the processor
 void proc_exit(PCBFile *myProc){
     // Add to transfer times
     myProc->trans();
@@ -90,6 +95,8 @@ void proc_exit(PCBFile *myProc){
     
     if(myProc->state != PSTATE::EXIT)
         r(myProc);
+    else
+        myProc->closure = timer;
 }
 
 // Unicore process algorithm 1
@@ -124,15 +131,15 @@ void run_sim_unicore_RR() {
     int num_ran = 0; // Keep track of runs of current queue to make sure we aren't stuck on high priority forever
     int cqueue = (rand()%5) + 1; // Set the current queue to random priority
     PCBFile* tempPCB;
-    while(!emptyQueues()){
+    int count = 0;
+    while(!done && !emptyQueues()){
         
         // Determine which queue we are pulling from
         if(num_ran == cqueue) {
             num_ran = 0;
             if(cqueue > 1){
-                cqueue--;
-            }
-            else{
+                --cqueue;
+            }else{
                 cqueue = queueCount;
             }
         }
@@ -144,8 +151,19 @@ void run_sim_unicore_RR() {
             if(tempPCB != nullptr){
                 tempPCB->state = PSTATE::RUNNING;
 
+                if(tempPCB->burst == 0 || tempPCB->priority == 0){
+                    cout << "Burst: " << tempPCB->burst;
+                    cout << "Prio: " << tempPCB->priority;
+                }
+
+                // Protect against divide by 0 because 1/2 = 0 is dumb
+                if(tempPCB->priority/2 != 0)
+                    count = (tempPCB->burst * tempPCB->priority) - rand() % (tempPCB->burst * (tempPCB->priority/2)); 
+                else{
+                    count = (tempPCB->burst * tempPCB->priority) - rand() % (tempPCB->burst*tempPCB->priority);
+                }
                 // "Run" process by time quantum x burst (increment accumulation) with variable cutoffs using rand().
-                tempPCB->accu((tempPCB->burst * tempPCB->priority) - (rand() % (tempPCB->burst * tempPCB->priority/2)));
+                tempPCB->accu(count);
                 
                 // Send process to end of current queue
                 proc_exit(tempPCB);
@@ -229,11 +247,23 @@ void importData(){
     inputfile.close();
 }
 
-// Calculate averages and output them to the terminal
-void analyze(processtable PT, int processes){
+// Analyze the data taken from a data file
+void aDataFile(processtable& PT){
     long prioAccum[queueCount+1];
     long prioCount[queueCount+1];
     long avgAccum, avgArriv, avgPrio = 0;
+    int processes = PT.oldSize();
+
+    // TODO: FINALIZE ANALYSIS METHODS AND IMPLEMENT
+    cout << "TODO" << endl;
+}
+
+// Analyze our random, infinite process system
+void aNoDataFile(processtable& PT){
+    long prioAccum[queueCount+1];
+    long prioCount[queueCount+1];
+    long avgAccum, avgArriv, avgPrio = 0;
+    int processes = PT.size();
 
     // Initialize counters to 0
     for(int i = 0; i < queueCount+1; i++){
@@ -242,9 +272,9 @@ void analyze(processtable PT, int processes){
     }
 
     for(int i = 0; i < processes; i++){
-        cout << "Prio: " << PT[i]->priority << endl;
-        cout << prioAccum[PT[i]->priority] << endl;
-        cout << prioCount[PT[i]->priority] << endl;
+        // cout << "Prio: " << PT[i]->priority << endl;
+        // cout << prioAccum[PT[i]->priority] << endl;
+        // cout << prioCount[PT[i]->priority] << endl;
 
         // Add to global average variables
         avgAccum += PT[i]->accum;
@@ -252,27 +282,33 @@ void analyze(processtable PT, int processes){
         avgPrio  += PT[i]->priority;
 
         // Add to priority average variables
-        cout << "+= " << PT[i]->accum << endl;
+        // cout << "+= " << PT[i]->accum << endl;
         prioAccum[PT[i]->priority] += PT[i]->accum;
         prioCount[PT[i]->priority]++;
-        cout << prioAccum[PT[i]->priority] << endl;
-        cout << prioCount[PT[i]->priority] << endl;
-        cout << "---------------" << endl;
+        // cout << prioAccum[PT[i]->priority] << endl;
+        // cout << prioCount[PT[i]->priority] << endl;
+        // cout << "---------------" << endl;
     }
+
+    cout << "Processes: " << processes << endl;
 
     cout << "Average Accumulation: " << avgAccum/processes << endl;
     cout << "Average Arrival:      " << avgArriv/processes << endl;
     cout << "Average Priority:     " << avgPrio/processes << endl;
 
+    cout << "Averages based on priorities:" << endl;
     for(int i = 1; i < queueCount+1; i++){
-        if(false){
-
-        }else{
-            cout << "Priority " << i << " Accumulation Average: " << prioAccum[i]/prioCount[i] << endl;
-        }
+        cout << "Priority " << i << " Accumulation Average: " << prioAccum[i]/prioCount[i] << endl;
     }
+}
 
-    return;
+// Calculate averages and output them to the terminal
+void analyze(processtable& PT){
+    if(USEDATAFILE){
+        aDataFile(PT);
+    }else{
+        aNoDataFile(PT);
+    }
 }
 
 int main(){
@@ -321,7 +357,6 @@ int main(){
     // Create threads for processing cores and make them do the thing
     thread processors[NUMCORES];
     
-    cout << "In algorithm?" << endl;
     // Initialize and start thread processing
     for(int i = 0; i < NUMCORES; i++) {
         if(FCFS){
@@ -353,7 +388,7 @@ int main(){
     }
 
     // Do analysis stuff via PCB information
-    analyze(PT, processCount);
+    analyze(PT);
 
     return 0;
 }

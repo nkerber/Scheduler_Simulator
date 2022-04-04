@@ -29,6 +29,7 @@ class PCB{
         bool incdec = incr; // Inc means indefinitely running, so count how many time quantums the program runs for. Dec means we have a set number of operations to run, so go until it's finished. This is taken care of in accum().
         
         int arrival; // Int to determine when to initially place a process into the ready queue.
+        int closure; // Int to track at what time the process completes.
 
         std::stack<int>* sys_stack = nullptr; // Likely won't be used. Here for completion's sake.
 
@@ -60,6 +61,7 @@ class PCB{
             wait = waitIn;
             vars = varsIn;
             arrival = arrivalIn;
+            closure = 0;
             // sys_stack = sysstackIn;
         }
 };
