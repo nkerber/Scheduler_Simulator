@@ -252,9 +252,13 @@ void aDataFile(processtable& PT){
     long prioAccum[queueCount+1];
     long prioCount[queueCount+1];
     long avgAccum, avgArriv, avgPrio = 0;
-    int processes = PT.oldSize();
+    int processes = PT.oldSize() + PT.size();
+    float throughPut = static_cast<float>(processes) / static_cast<float>(timer);
+    
+    
 
     // TODO: FINALIZE ANALYSIS METHODS AND IMPLEMENT
+    //int timeTaken = PT.closure - PT.arrival
     cout << "TODO" << endl;
 }
 
@@ -386,6 +390,9 @@ int main(){
     for(int i = 0; i < NUMCORES; i++) {
         processors[i].join();
     }
+
+    //throughput = processCount / timer
+    //cout << "Throughput: "  << processCount / timer << endl;
 
     // Do analysis stuff via PCB information
     analyze(PT);
