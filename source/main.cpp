@@ -82,7 +82,7 @@ PCBFile* getPCB(bool fcfs = true, int pq = 1){
         }
     }
 
-    if(x->rt < 0) x-> rt += timer;
+    if(x != nullptr && x->rt < 0) x-> rt += timer;
     
     return x;
 }
@@ -278,6 +278,10 @@ void aDataFile(processtable& PT){
     cout << "Processes:        " << processes << endl;
     cout << "Average Arrival:  " << avgArriv/processes << endl;
     cout << "Average Priority: " << avgPrio/processes << endl;
+    cout << "Average Throughput: " << throughPut << endl;
+    cout << "Average Turnaround time: " << turnAroundTime << endl;
+
+
 }
 
 // Analyze our random, infinite process system
@@ -371,6 +375,8 @@ int main(){
     // Create threads for processing cores and make them do the thing
     thread processors[NUMCORES];
     
+    cout << "made it 2"<< endl;
+
     // Initialize and start thread processing
     for(int i = 0; i < NUMCORES; i++) {
         if(FCFS){
@@ -380,7 +386,7 @@ int main(){
         }
         // processors[i] = thread(sleep, 5);
     }
-
+    
     // "Slowly" iterate timer to simulate time passing, and have those later processes added to the queue later in the simulation
     
     while(timer++ < TIMERMAX){
@@ -403,7 +409,6 @@ int main(){
 
     //throughput = processCount / timer
     //cout << "Throughput: "  << processCount / timer << endl;
-
     // Do analysis stuff via PCB information
     analyze(PT);
 
