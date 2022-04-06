@@ -24,6 +24,8 @@ int timer = 0;
 
 // Lock the correct queue, push the given process onto the queue and set its state to ready.
 void r(PCBFile* item){
+    if(item->state == PSTATE::NEW)
+        item->rt = -timer;
     if(FCFS){
         rm.lock();
         ready.push(item);
@@ -79,6 +81,8 @@ PCBFile* getPCB(bool fcfs = true, int pq = 1){
             return nullptr;
         }
     }
+
+    if(x->rt < 0) x-> rt += timer;
     
     return x;
 }
@@ -107,10 +111,10 @@ void run_sim_unicore_FCFS() {
         if(x != nullptr){
             // Change state
             x->state = PSTATE::RUNNING;
-
+            
             // Add transfer time to the trackers
             x->trans();
-
+            
             // "Execute" the process. I.e. run the process for burst time * priority
             x->accu();
 
@@ -152,9 +156,9 @@ void run_sim_unicore_RR() {
                 // Protect against divide by 0 because 1/2 = 0 is dumb
                 if(tempPCB->priority/2 != 0)
                     count = (tempPCB->burst * tempPCB->priority) - rand() % (tempPCB->burst * (tempPCB->priority/2)); 
-                else{
+                else
                     count = (tempPCB->burst * tempPCB->priority) - rand() % (tempPCB->burst*tempPCB->priority);
-                }
+                
                 // "Run" process by time quantum x burst (increment accumulation) with variable cutoffs using rand().
                 tempPCB->accu(count);
                 
@@ -162,7 +166,6 @@ void run_sim_unicore_RR() {
                 proc_exit(tempPCB);
             }
         }
-
         // Increment numran whether we executed a process or not.
         num_ran++;
     }
@@ -206,7 +209,6 @@ void importData(){
                 } else if (li == "Arrival") {
                     // Get the arrival time from the next word in the file, and store it in arrivalTime variable
                     inputfile >> li;
-                    cout << "Arrival is: " << li.substr(0,li.length()-1) << endl;
                     arrivalTime = stoi(li.substr(0,li.length()-1));
 
                 // If we find a CPU burst time quantum header
@@ -242,17 +244,40 @@ void importData(){
 
 // Analyze the data taken from a data file
 void aDataFile(processtable& PT){
-    long prioAccum[queueCount+1];
     long prioCount[queueCount+1];
-    long avgAccum, avgArriv, avgPrio = 0;
+    long avgArriv, avgPrio = 0;
     int processes = PT.oldSize() + PT.size();
-    float throughPut = static_cast<float>(processes) / static_cast<float>(timer);
-    
-    
+    float throughPut;  
+    int turnAroundTime = 0;
+    int maxClosure = 0;
 
-    // TODO: FINALIZE ANALYSIS METHODS AND IMPLEMENT
-    //int timeTaken = PT.closure - PT.arrival
-    cout << "TODO" << endl;
+    for (int i = 0; i < PT.oldSize(); i++){
+        turnAroundTime += (PT.getOld(i)->closure - PT.getOld(i)->arrival);
+    }
+    
+    for (int j = 0; j < PT.oldSize(); j++) {
+        if (PT.getOld(j)->closure > maxClosure){
+            maxClosure = PT.getOld(j)->closure;
+        }
+    }
+    
+    throughPut = static_cast<float>(processes) / static_cast<float>(maxClosure);
+
+    // Initialize counters to 0
+    for(int i = 0; i < queueCount+1; i++){
+        prioCount[i] = 0;
+    }
+
+    for(int i = 0; i < processes; i++){
+        // Add to global average variables
+        avgArriv += PT[i]->arrival;
+        // Add to priority average variables
+        ++prioCount[PT[i]->priority];
+    }
+
+    cout << "Processes:        " << processes << endl;
+    cout << "Average Arrival:  " << avgArriv/processes << endl;
+    cout << "Average Priority: " << avgPrio/processes << endl;
 }
 
 // Analyze our random, infinite process system
@@ -269,22 +294,14 @@ void aNoDataFile(processtable& PT){
     }
 
     for(int i = 0; i < processes; i++){
-        // cout << "Prio: " << PT[i]->priority << endl;
-        // cout << prioAccum[PT[i]->priority] << endl;
-        // cout << prioCount[PT[i]->priority] << endl;
-
         // Add to global average variables
         avgAccum += PT[i]->accum;
         avgArriv += PT[i]->arrival;
         avgPrio  += PT[i]->priority;
 
         // Add to priority average variables
-        // cout << "+= " << PT[i]->accum << endl;
         prioAccum[PT[i]->priority] += PT[i]->accum;
         prioCount[PT[i]->priority]++;
-        // cout << prioAccum[PT[i]->priority] << endl;
-        // cout << prioCount[PT[i]->priority] << endl;
-        // cout << "---------------" << endl;
     }
 
     cout << "Processes: " << processes << endl;
@@ -317,12 +334,12 @@ int main(){
         pids.push(i);
     }
 
-    if (USEDATAFILE) {
+    if(USEDATAFILE){
         // Use the process data provided by random_pids.csv to add processes to our process table,
         // and quit if something goes wrong with the import.
-        try {
+        try{
             importData();
-        } catch (invalid_argument &e) {
+        }catch(invalid_argument &e){
             cerr << e.what() << endl;
             return -1;
         }

@@ -55,6 +55,10 @@ class processtable{
             return false;
         }
 
+        PCBFile* getOld(int i){
+            return oldProcesses[i];
+        }
+
         PCBFile* operator[](const int i){
             return processes[i];
         }

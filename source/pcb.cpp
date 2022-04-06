@@ -31,9 +31,11 @@ class PCB{
         int closure; // Int to track at what time the process completes.
         int cSwitch; // Used to keep track of how many time quantums each process is being swapped in/out.
         int wait; // Used to determine waiting queues and how long that would add to the accum. variable.
+        int rt = 0;
 
         std::stack<int>* sys_stack = nullptr; // Likely won't be used. Here for completion's sake.
 
+        // Constructor stacks -- Ignore these for the most part. Shouldn't ever instantiate a PCB, using PCBFile instead.
         PCB() : PCB(rand()%9700+300){}
         PCB(int id) : PCB(id, rand()%300){}
         PCB(int id, int ppid) : PCB(id, ppid, rand()%3){}
