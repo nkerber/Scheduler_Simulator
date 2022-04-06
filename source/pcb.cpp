@@ -11,7 +11,7 @@
 #define decr 0
 #define incr 1
 
-const int IOsims[5]= {10,8,6,4,2};                              // All assumed to have differrent wait times based on to simulate slower IO devices.
+const int IOsims[5]= {10,8,6,4,2}; // All assumed to have differrent wait times based on to simulate slower IO devices.
 
 class PCB{
     public:
@@ -21,15 +21,16 @@ class PCB{
         int priority; // 1-5, higher number means higher priority
         int state; // 0 - New, 1 - Ready, 2 - Running, 3 - Blocked, 4 - Exit
         int burst; // 1-15 clock cycles (cc)
-        int accum; // Total cc this process has been worked on (Transfer, wait, proccess, etc.)
         int pc; // Arbitrary, likely won't use but for completion's sake
-        int cSwitch; // Int to act as 32/64 flags. Likely won't be used, but here for completion's sake.
-        int wait; // Used to determine waiting queues and how long that would add to the accum. variable.
         int* vars; // Assume ints, for simplicity.
         bool incdec = incr; // Inc means indefinitely running, so count how many time quantums the program runs for. Dec means we have a set number of operations to run, so go until it's finished. This is taken care of in accum().
         
+        // Analysis variables
+        int accum; // Total cc this process has been worked on (Transfer, wait, proccess, etc.)
         int arrival; // Int to determine when to initially place a process into the ready queue.
         int closure; // Int to track at what time the process completes.
+        int cSwitch; // Used to keep track of how many time quantums each process is being swapped in/out.
+        int wait; // Used to determine waiting queues and how long that would add to the accum. variable.
 
         std::stack<int>* sys_stack = nullptr; // Likely won't be used. Here for completion's sake.
 
@@ -37,7 +38,7 @@ class PCB{
         PCB(int id) : PCB(id, rand()%300){}
         PCB(int id, int ppid) : PCB(id, ppid, rand()%3){}
         PCB(int id, int ppid, int uacct) : PCB(id, ppid, uacct, rand()%queueCount + 1){}
-        PCB(int id, int ppid, int uacct, int priority) : PCB(id, ppid, uacct, priority, 0){}
+        PCB(int id, int ppid, int uacct, int priority) : PCB(id, ppid, uacct, priority, PSTATE::NEW){}
         PCB(int id, int ppid, int uacct, int priority, int state) : PCB(id, ppid, uacct, priority, state, rand()%15+1){}
         PCB(int id, int ppid, int uacct, int priority, int state, int burst) : PCB(id, ppid, uacct, priority, state, burst, 0){}
         PCB(int id, int ppid, int uacct, int priority, int state, int burst, int accum) : PCB(id, ppid, uacct, priority, state, burst, accum, 0){}
@@ -45,7 +46,6 @@ class PCB{
         PCB(int id, int ppid, int uacct, int priority, int state, int burst, int accum, int pc, int cSwitch) : PCB(id, ppid, uacct, priority, state, burst, accum, pc, cSwitch, 0){}
         PCB(int id, int ppid, int uacct, int priority, int state, int burst, int accum, int pc, int cSwitch, int wait) : PCB(id, ppid, uacct, priority, state, burst, accum, pc, cSwitch, wait, nullptr){}
         PCB(int id, int ppid, int uacct, int priority, int state, int burst, int accum, int pc, int cSwitch, int wait, int* vars) : PCB(id, ppid, uacct, priority, state, burst, accum, pc, cSwitch, wait, vars, rand()%TIMERMAX){}
-        // PCB(int id, int ppid, int uacct, int priority, int state, int burst, int accum, int pc, int cCode, int wait, int* vars, int arrival) : PCB(id, ppid, uacct, priority, state, burst, accum, pc, cCode, wait, vars, arrival, nullptr){}
         PCB(int idIn, int ppidIn, int uacctIn, int priorityIn, int stateIn, int burstIn, int accumIn, int pcIn, int cSwitchIn, int waitIn, int* varsIn, int arrivalIn){//, localstack* sysstackIn){
             pid = idIn;
             ppid = ppidIn;
@@ -62,7 +62,6 @@ class PCB{
             vars = varsIn;
             arrival = arrivalIn;
             closure = 0;
-            // sys_stack = sysstackIn;
         }
 };
 
@@ -118,8 +117,10 @@ class PCBFile : public PCB {
             if(incdec == incr){
                 // If process is sent to an I/O wait
                 if(rand() % 2){
+                    int io = rand()%5;
                     state = PSTATE::BLOCKED;
-                    wait += IOsims[rand() % 5]; // 5 = Number of IO "queues" to simulate IO wait times
+                    wait += IOsims[io]; // 5 = Number of IO "queues" to simulate IO wait times
+                    accum += IOsims[io];
                     trans();
                 }
             }else{

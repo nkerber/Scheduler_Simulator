@@ -53,15 +53,17 @@ bool emptyQueues(){
 
 // Return the newest PCB for whichever algorithm we are using ()
 PCBFile* getPCB(bool fcfs = true, int pq = 1){
-    PCBFile* x;
+    PCBFile* x = nullptr;
 
     // If we are using FCFS
     if(fcfs){
         if(!ready.empty()){
             // Lock, pop, unlock
             rm.lock();
-            x = ready.front();
-            ready.pop();
+            if(!ready.empty()){
+                x = ready.front();
+                ready.pop();
+            }
             rm.unlock();
         }else{
             return nullptr;
@@ -70,12 +72,8 @@ PCBFile* getPCB(bool fcfs = true, int pq = 1){
         if(!pready[pq].empty()){
             // Lock, pop, unlock
             prm[pq].lock();
-            try{
-                x = pready[pq].front();
-                pready[pq].pop();
-            }catch(exception e){
-                return nullptr;
-            }
+            x = pready[pq].front();
+            pready[pq].pop();
             prm[pq].unlock();
         }else{
             return nullptr;
@@ -150,11 +148,6 @@ void run_sim_unicore_RR() {
             tempPCB = getPCB(false, cqueue);
             if(tempPCB != nullptr){
                 tempPCB->state = PSTATE::RUNNING;
-
-                if(tempPCB->burst == 0 || tempPCB->priority == 0){
-                    cout << "Burst: " << tempPCB->burst;
-                    cout << "Prio: " << tempPCB->priority;
-                }
 
                 // Protect against divide by 0 because 1/2 = 0 is dumb
                 if(tempPCB->priority/2 != 0)
