@@ -244,15 +244,15 @@ void importData(){
 * Average responsetime  
 * Average throughput    --
 */
-void aDataFile(processtable& PT){
+void aDataFile(processtable& PT,float& totTP, float& totWait, float& totRT, float& totTA, float& totCS){
     int processes = PT.oldSize() + PT.size(), maxClosure = 0;
     long prioCount[queueCount+1];
     long avgArriv = 0, avgPrio = 0;
     float throughPut = 0;
     long avgWait = 0, avgRT = 0, avgtat = 0, avgTrans = 0;
 
-    (FCFS) ? printf("First-Come-First-Serve Algorithm Results:\n"): printf("Round-Robin Algorithm Results:\n");
-    printf("Using local file data!\n Completed Processes: %d\n",PT.oldSize());
+    //(FCFS) ? printf("First-Come-First-Serve Algorithm Results:\n"): printf("Round-Robin Algorithm Results:\n");
+    //printf("Using local file data!\n Completed Processes: %d\n",PT.oldSize());
 
     // Initialize counters to 0
     for(int i = 0; i < queueCount+1; i++){
@@ -302,14 +302,23 @@ void aDataFile(processtable& PT){
             avgTrans += PT.getOld(i)->cSwitch;
         }
     }
+    
+    totTP += throughPut;
+    totWait += static_cast<float>(avgWait)/static_cast<float>(processes);
+    totRT += static_cast<float>(avgRT)/static_cast<float>(processes);
+    totTA += static_cast<float>(avgtat)/static_cast<float>(processes);
+    totCS += static_cast<float>(avgTrans)/static_cast<float>(processes);
 
-    cout << "Processes:                 " << processes << endl;
-    cout << "Simulated Throughput:      " << throughPut << endl;
-    cout << "Average Arrival:           " << static_cast<int>(static_cast<float>(avgArriv)/static_cast<float>(processes)) << endl;
-    cout << "Average Response Time:     " << static_cast<float>(avgRT)/static_cast<float>(processes) << endl;
-    cout << "Average Wait Time:         " << static_cast<float>(avgWait)/static_cast<float>(processes) << endl;
-    cout << "Average Turnaround time:   " << static_cast<float>(avgtat)/static_cast<float>(processes) << endl;
-    cout << "Average Context Swap time: " << static_cast<float>(avgTrans)/static_cast<float>(processes) << endl;
+    
+    // cout << "Processes:                 " << processes << endl;
+    // cout << "Simulated Throughput:      " << throughPut << endl;
+    // cout << "Average Arrival:           " << static_cast<int>(static_cast<float>(avgArriv)/static_cast<float>(processes)) << endl;
+    // cout << "Average Response Time:     " << static_cast<float>(avgRT)/static_cast<float>(processes) << endl;
+    // cout << "Average Wait Time:         " << static_cast<float>(avgWait)/static_cast<float>(processes) << endl;
+    //cout << "Average Turnaround time:   " << static_cast<float>(avgtat)/static_cast<float>(processes) << endl;
+    // cout << "Average Context Swap time: " << static_cast<float>(avgTrans)/static_cast<float>(processes) << endl;
+    
+
 }
 
 // Analyze our random, infinite process system
@@ -349,15 +358,17 @@ void aNoDataFile(processtable& PT){
 }
 
 // Calculate averages and output them to the terminal
-void analyze(processtable& PT){
+void analyze(processtable& PT, float& totTP, float& totWait, float& totRT, float& totTA, float& totCS){
     if(USEDATAFILE){
-        aDataFile(PT);
+        aDataFile(PT,totTP,totWait,totRT,totTA,totCS);
     }else{
         aNoDataFile(PT);
     }
 }
 
 int main(){
+    float totTP = 0, totWait = 0, totRT = 0, totTA = 0, totCS = 0;
+    for (int i = 0; i < 10; i++) {
     srand(12345);
     stack<int> pids; // Stack for assigning PIDs
     int processCount = RANDPROCESSNUM;
@@ -446,7 +457,16 @@ int main(){
     }
     
     // Do analysis stuff via PCB information
-    analyze(PT);
+    analyze(PT,totTP,totWait,totRT,totTA,totCS);
+    timer = 0;
+    }
+
+    cout << "Simulated Throughput:      " << totTP/10 << endl;
+    cout << "Average Response Time:     " << totRT/10 << endl;
+    cout << "Average Wait Time:         " << totWait/10 << endl;
+    cout << "Average Turnaround time:   " << totTA/10 << endl;
+    cout << "Average Context Swap time: " << totCS/10 << endl;
+    
 
     return 0;
 }
