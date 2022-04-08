@@ -4,7 +4,6 @@
 #include <queue>
 #include <thread>
 #include <unistd.h>
-#include <mutex>
 #include <iostream>
 #include <fstream>
 #include <cstdlib>
@@ -24,18 +23,20 @@ int timer = 0;
 
 // Lock the correct queue, push the given process onto the queue and set its state to ready.
 void r(PCBFile* item){
+    if(item == nullptr){
+        cout << "NULLPTR ERROR! DROPPING PROCESS." << endl;
+        return;
+    }
+
     if(item->state == PSTATE::NEW)
         item->rt = -timer;
+    
     if(FCFS){
         rm.lock();
         ready.push(item);
         item->state = PSTATE::READY;
         rm.unlock();
     }else{
-        if(item == nullptr){
-            cout << "NULLPTR ERROR! DROPPING PROCESS." << endl;
-            return;
-        }
         prm[item->priority].lock();
         pready[item->priority].push(item);
         item->state = PSTATE::READY;
@@ -59,17 +60,13 @@ PCBFile* getPCB(bool fcfs = true, int pq = 1){
 
     // If we are using FCFS
     if(fcfs){
+        // Lock, pop, unlock
+        rm.lock();
         if(!ready.empty()){
-            // Lock, pop, unlock
-            rm.lock();
-            if(!ready.empty()){
-                x = ready.front();
-                ready.pop();
-            }
-            rm.unlock();
-        }else{
-            return nullptr;
+            x = ready.front();
+            ready.pop();
         }
+        rm.unlock();
     }else{
         if(!pready[pq].empty()){
             // Lock, pop, unlock
@@ -77,13 +74,11 @@ PCBFile* getPCB(bool fcfs = true, int pq = 1){
             x = pready[pq].front();
             pready[pq].pop();
             prm[pq].unlock();
-        }else{
-            return nullptr;
         }
     }
 
     if(x != nullptr && x->rt < 0) x-> rt += timer;
-    
+
     return x;
 }
 
@@ -92,13 +87,19 @@ void proc_exit(PCBFile *myProc){
     // Add to transfer times
     myProc->trans();
 
-    // Check for IO location/proc
-    myProc->io();
-    
+    if(myProc->state != PSTATE::EXIT){
+        // Check for IO location/proc
+        myProc->io();
+    }
+
     if(myProc->state != PSTATE::EXIT)
         r(myProc);
-    else
+    else{
+        if(!PT.remove(myProc)){
+            cout << "Error" << endl;
+        }
         myProc->closure = timer;
+    }
 }
 
 // Unicore process algorithm 1
@@ -112,7 +113,7 @@ void run_sim_unicore_FCFS() {
             // Change state
             x->state = PSTATE::RUNNING;
             
-            // Add transfer time to the trackers
+            // Add transfer time to the trackers for entering the processor
             x->trans();
             
             // "Execute" the process. I.e. run the process for burst time * priority
@@ -133,7 +134,6 @@ void run_sim_unicore_RR() {
     int num_ran = 0; // Keep track of runs of current queue to make sure we aren't stuck on high priority forever
     int cqueue = (rand()%5) + 1; // Set the current queue to random priority
     PCBFile* tempPCB;
-    int count = 0;
     while(!done && !emptyQueues()){
         
         // Determine which queue we are pulling from
@@ -153,14 +153,8 @@ void run_sim_unicore_RR() {
             if(tempPCB != nullptr){
                 tempPCB->state = PSTATE::RUNNING;
 
-                // Protect against divide by 0 because 1/2 = 0 is dumb
-                if(tempPCB->priority/2 != 0)
-                    count = (tempPCB->burst * tempPCB->priority) - rand() % (tempPCB->burst * (tempPCB->priority/2)); 
-                else
-                    count = (tempPCB->burst * tempPCB->priority) - rand() % (tempPCB->burst*tempPCB->priority);
-                
                 // "Run" process by time quantum x burst (increment accumulation) with variable cutoffs using rand().
-                tempPCB->accu(count);
+                tempPCB->accu();
                 
                 // Send process to end of current queue
                 proc_exit(tempPCB);
@@ -183,8 +177,8 @@ void importData(){
 
     int arrivalTime;
     int pid;
-    vector<int> cpuTimes;
-    vector<int> ioTimes;
+    vector<int>* cpuTimes = new vector<int>();
+    vector<int>* ioTimes = new vector<int>();
 
     inputfile.open("random_pids.csv");
         if (inputfile.is_open()) {
@@ -195,10 +189,10 @@ void importData(){
                 if (li == "PID") {
 
                     // Check if we already have data that we need to add to our PT
-                    if (!cpuTimes.empty()) {
-                        PT.add(new PCBFile(pid, arrivalTime, new vector<int>(cpuTimes), new vector<int>(ioTimes)));
-                        cpuTimes.clear();
-                        ioTimes.clear();
+                    if (!cpuTimes->empty()) {
+                        PT.add(new PCBFile(pid, arrivalTime, cpuTimes, ioTimes));
+                        cpuTimes->clear();
+                        ioTimes->clear();
                     }
 
                     // Get the PID from the next word in the file, and store it in pid variable
@@ -216,16 +210,16 @@ void importData(){
                     // Get the CPU burst time from the next word in the file, and push it back to the CPU burst vector
                     inputfile >> li;
                     if (li.find(',') && li.length() != 1) {
-                        cpuTimes.push_back(stoi(li.substr(0,li.length()-1)));
-                    } else cpuTimes.push_back(stoi(li));
+                        cpuTimes->push_back(stoi(li.substr(0,li.length()-1)));
+                    } else cpuTimes->push_back(stoi(li));
                     
                 // If we find an IO burst time quantum header
                 } else if (li == "IO") {
                     // Get the IO burst time from the next word in the file, and push it back to the IO burst vector
                     inputfile >> li;
                     if (li.find(',') && li.length() != 1) {
-                        ioTimes.push_back(stoi(li.substr(0,li.length()-1)));
-                    } else ioTimes.push_back(stoi(li));
+                        ioTimes->push_back(stoi(li.substr(0,li.length()-1)));
+                    } else ioTimes->push_back(stoi(li));
                 
                 // Otherwise, you screwed up. My generator is perfect - Nate
                 } else {
@@ -234,8 +228,8 @@ void importData(){
             }
 
             // Push the last set of process variables to the process table
-            if (!cpuTimes.empty()) {
-                PT.add(new PCBFile(pid, arrivalTime, &cpuTimes, &ioTimes));
+            if (!cpuTimes->empty()) {
+                PT.add(new PCBFile(pid, arrivalTime, cpuTimes, ioTimes));
             }
         }
 
@@ -243,45 +237,79 @@ void importData(){
 }
 
 // Analyze the data taken from a data file
+// Analyzes the following:
+/*
+* Average turnaround    --
+* Average wait          
+* Average responsetime  
+* Average throughput    --
+*/
 void aDataFile(processtable& PT){
+    int processes = PT.oldSize() + PT.size(), maxClosure = 0;
     long prioCount[queueCount+1];
-    long avgArriv, avgPrio = 0;
-    int processes = PT.oldSize() + PT.size();
-    float throughPut;  
-    int turnAroundTime = 0;
-    int maxClosure = 0;
+    long avgArriv = 0, avgPrio = 0;
+    float throughPut = 0;
+    long avgWait = 0, avgRT = 0, avgtat = 0, avgTrans = 0;
 
-    for (int i = 0; i < PT.oldSize(); i++){
-        turnAroundTime += (PT.getOld(i)->closure - PT.getOld(i)->arrival);
-    }
-    
-    for (int j = 0; j < PT.oldSize(); j++) {
-        if (PT.getOld(j)->closure > maxClosure){
-            maxClosure = PT.getOld(j)->closure;
-        }
-    }
-    
-    throughPut = static_cast<float>(processes) / static_cast<float>(maxClosure);
+    (FCFS) ? printf("First-Come-First-Serve Algorithm Results:\n"): printf("Round-Robin Algorithm Results:\n");
+    printf("Using local file data!\n Completed Processes: %d\n",PT.oldSize());
 
     // Initialize counters to 0
     for(int i = 0; i < queueCount+1; i++){
         prioCount[i] = 0;
     }
 
+    // For all completed processes
+    for(int i = 0; i < PT.oldSize(); i++){
+        // Turn around time data collection
+        avgtat += (PT.getOld(i)->closure - PT.getOld(i)->arrival);
+
+        // Throughput data collection
+        if(PT.getOld(i)->closure > maxClosure){
+            maxClosure = PT.getOld(i)->closure;
+        }
+    }
+    throughPut = static_cast<float>(PT.oldSize()) / static_cast<float>(maxClosure);
+
+    // For all processes
     for(int i = 0; i < processes; i++){
-        // Add to global average variables
-        avgArriv += PT[i]->arrival;
-        // Add to priority average variables
-        ++prioCount[PT[i]->priority];
+        if(PT[i] != nullptr){
+            // Add to global average variables
+            avgArriv += PT[i]->arrival;
+            // Add to priority average variables
+            ++prioCount[PT[i]->priority];
+            // Add to average weight
+            avgWait += PT[i]->wait;
+            // Add to response time
+            avgRT += PT[i]->rt;
+            // Add to transfer time
+            avgTrans += PT[i]->cSwitch;
+
+            if(PT[i]->CPUt->empty() && PT[i]->IOt->size()){
+                cout << "Error" << endl;
+            }
+        }
+        if(PT.getOld(i) != nullptr){
+            // Add to global average variables
+            avgArriv += PT.getOld(i)->arrival;
+            // Add to priority average variables
+            ++prioCount[PT.getOld(i)->priority];
+            // Add to average weight
+            avgWait += PT.getOld(i)->wait;
+            // Add to response time
+            avgRT += PT.getOld(i)->rt;
+            // Add to transfer time
+            avgTrans += PT.getOld(i)->cSwitch;
+        }
     }
 
-    cout << "Processes:        " << processes << endl;
-    cout << "Average Arrival:  " << avgArriv/processes << endl;
-    cout << "Average Priority: " << avgPrio/processes << endl;
-    cout << "Average Throughput: " << throughPut << endl;
-    cout << "Average Turnaround time: " << turnAroundTime << endl;
-
-
+    cout << "Processes:                 " << processes << endl;
+    cout << "Simulated Throughput:      " << throughPut << endl;
+    cout << "Average Arrival:           " << static_cast<int>(static_cast<float>(avgArriv)/static_cast<float>(processes)) << endl;
+    cout << "Average Response Time:     " << static_cast<float>(avgRT)/static_cast<float>(processes) << endl;
+    cout << "Average Wait Time:         " << static_cast<float>(avgWait)/static_cast<float>(processes) << endl;
+    cout << "Average Turnaround time:   " << static_cast<float>(avgtat)/static_cast<float>(processes) << endl;
+    cout << "Average Context Swap time: " << static_cast<float>(avgTrans)/static_cast<float>(processes) << endl;
 }
 
 // Analyze our random, infinite process system
@@ -289,7 +317,7 @@ void aNoDataFile(processtable& PT){
     long prioAccum[queueCount+1];
     long prioCount[queueCount+1];
     long avgAccum, avgArriv, avgPrio = 0;
-    int processes = PT.size();
+    int processes = PT.size() + PT.oldSize();
 
     // Initialize counters to 0
     for(int i = 0; i < queueCount+1; i++){
@@ -310,9 +338,9 @@ void aNoDataFile(processtable& PT){
 
     cout << "Processes: " << processes << endl;
 
-    cout << "Average Accumulation: " << avgAccum/processes << endl;
-    cout << "Average Arrival:      " << avgArriv/processes << endl;
-    cout << "Average Priority:     " << avgPrio/processes << endl;
+    cout << "Average Accumulation: " << static_cast<float>(avgAccum)/static_cast<float>(processes) << endl;
+    cout << "Average Arrival:      " << static_cast<float>(avgArriv)/static_cast<float>(processes) << endl;
+    cout << "Average Priority:     " << static_cast<float>(avgPrio)/static_cast<float>(processes) << endl;
 
     cout << "Averages based on priorities:" << endl;
     for(int i = 1; i < queueCount+1; i++){
@@ -333,6 +361,7 @@ int main(){
     srand(12345);
     stack<int> pids; // Stack for assigning PIDs
     int processCount = RANDPROCESSNUM;
+    vector<PCBFile*> temp;
 
     for(int i = PTSIZE; i >= 300; i--){ // Initialize stack with all potential PIDs. Shouldn't ever reach this, given our RANDPROCESSNUM is lower than 
         pids.push(i);
@@ -362,10 +391,18 @@ int main(){
         }
     }
 
+    for(int i = 0; i < PT.size(); i++){
+        temp.push_back(PT[i]);
+    }
+    
+    vector<PCBFile*>::iterator p = temp.begin();
     // Push all arrival 0 items into the ready queue
     for(int i = 0; i < processCount; i++){
-        if(!PT[i]->state && PT[i]->arrival <= timer){
-            r(PT[i]);
+        if(!temp[i]->state && temp[i]->arrival <= timer){
+            r(temp[i]); 
+            swap(temp[i], temp[temp.size()-1]);
+            temp.pop_back();
+            i--;
         }
     }
 
@@ -374,8 +411,6 @@ int main(){
 
     // Create threads for processing cores and make them do the thing
     thread processors[NUMCORES];
-    
-    cout << "made it 2"<< endl;
 
     // Initialize and start thread processing
     for(int i = 0; i < NUMCORES; i++) {
@@ -386,13 +421,16 @@ int main(){
         }
         // processors[i] = thread(sleep, 5);
     }
-    
+
     // "Slowly" iterate timer to simulate time passing, and have those later processes added to the queue later in the simulation
-    
     while(timer++ < TIMERMAX){
-        for(int j = 0; j < processCount; j++){
-            if(!PT[j]->state && PT[j]->arrival <= timer)
-                r(PT[j]);
+        for(int j = 0; j < temp.size(); j++){
+            if(temp[j] != nullptr && !temp[j]->state && temp[j]->arrival <= timer){
+                r(temp[j]);
+                swap(temp[j], temp[temp.size()-1]);
+                temp.pop_back();
+                j--;
+            }
         }
     }
 
@@ -406,9 +444,7 @@ int main(){
     for(int i = 0; i < NUMCORES; i++) {
         processors[i].join();
     }
-
-    //throughput = processCount / timer
-    //cout << "Throughput: "  << processCount / timer << endl;
+    
     // Do analysis stuff via PCB information
     analyze(PT);
 

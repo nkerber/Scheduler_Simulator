@@ -6,10 +6,11 @@
 #include <algorithm>
 #include <iostream>
 #include <vector>
+#include <mutex>
 #include "./globals.cpp"
 
-#define decr 0
-#define incr 1
+#define decr 1
+#define incr 0
 
 const int IOsims[5]= {10,8,6,4,2}; // All assumed to have differrent wait times based on to simulate slower IO devices.
 
@@ -68,6 +69,8 @@ class PCB{
 };
 
 class PCBFile : public PCB {
+    private:
+        std::mutex m;
     public:
         std::vector<int>* CPUt;
         std::vector<int>* IOt;
@@ -78,16 +81,21 @@ class PCBFile : public PCB {
                 this->arrival = arr;
             this->CPUt = cputimes;
             this->IOt = iotimes;
+
+            if(CPUt != nullptr && !CPUt->empty()){
+                incdec = decr;
+            }
         }
         
         void trans(){
             if(incdec == decr && CPUt != nullptr && CPUt->empty() && IOt != nullptr && IOt->empty()){  // If we have no more to do
                 // Remove this process from the table by signalling an exit state
-                state = 4;
-                cSwitch += 1; // Transfer time quantum
+                state = PSTATE::EXIT;
+                cSwitch += TIMEQUANTUM; // Transfer time quantum
             }else{
-                accum += 1; // Transfer time quantum
-                cSwitch += 1; // Transfer time quantum
+                // std::cout << (CPUt->empty()) << std::endl;
+                accum += TIMEQUANTUM; // Transfer time quantum
+                cSwitch += TIMEQUANTUM; // Transfer time quantum
             }
         }
 
@@ -98,15 +106,28 @@ class PCBFile : public PCB {
                     state = 4;
                     cSwitch += 1; // Transfer time quantum
                 }else{
-                    if(value != 0){
-                        if(CPUt != nullptr && !CPUt->empty())
-                            CPUt->front() -= value;
-                    }else{
-                        if(CPUt != nullptr && !CPUt->empty())
-                            CPUt->front() -= burst * priority;
-                    }
-                }
+                    // Values to decrement by
+                    int t[2] = {0,0};
 
+                    // FCFS value
+                    t[0] = burst * priority;
+                    
+                    // RR value
+                    // Protect against divide by 0 because 1/2 = 0 is dumb
+                    if(priority/2 != 0)
+                        t[1] = (burst * priority) - rand() % (burst * (priority/2)); 
+                    else
+                        t[1] = (burst * priority) - rand() % (burst*priority);
+
+                    // m.lock();
+                    // If we have CPU stuff to decrement
+                    if(CPUt != nullptr && !CPUt->empty()){
+                        // Decrement it, using the correct algorithm
+                        (FCFS) ? CPUt->at(0) -= t[0] : CPUt->at(0) -= t[1];
+                        //                      ^FCFS                  ^RR
+                    }
+                    // m.unlock();
+                }
             }else{  // If we are not using file IO and this is an indefinite process
                 if(value != 0)
                     accum += value;
@@ -127,11 +148,12 @@ class PCBFile : public PCB {
                 }
             }else{
                 // Calculate where the next IO location would be based on however we would store our I/O locations
-                if(CPUt != nullptr && CPUt->front() <= 0){  // If we have hit an IO location
+                if(CPUt != nullptr && !CPUt->empty() && CPUt->front() <= 0){  // If we have hit an IO location
                     CPUt->erase(CPUt->begin());
                     if(IOt != nullptr && !IOt->empty()){
                         state = PSTATE::BLOCKED;
                         wait += IOt->front();
+                        IOt->erase(IOt->begin());
                         trans();
                     }
                 }
